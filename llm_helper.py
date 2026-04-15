@@ -2,12 +2,12 @@ from dotenv import load_dotenv
 import os
 from google import genai
 
+# Load environment variables
 load_dotenv()
-from google import genai
-import os
 
-# 🔐 Use environment variable (for deployment safety)
+# Initialize client safely
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 def get_financial_advice(data):
 
@@ -22,41 +22,54 @@ def get_financial_advice(data):
     # =========================
     else:
         prompt = f"""
-        You are a financial advisor for Indian users.
+        You are a smart financial advisor for Indian users.
+
+        RULES:
+        - Do NOT repeat points
+        - Be concise and practical
+        - Give new insights each time
+        - Use simple language
+        - Personalize based on user data
 
         User Profile:
-        - Age: {data['age']}
-        - Salary: {data['salary']}
-        - Savings: {data['savings']}
+        - Age: {data.get('age')}
+        - Salary: {data.get('salary')}
+        - Savings: {data.get('savings')}
 
         Expenses:
-        {data['expenses']}
+        {data.get('expenses')}
 
         Financial Obligations:
-        - Loan EMI: {data['loans']}
-        - Credit Card Dues: {data['cc_dues']}
+        - Loan EMI: {data.get('loans')}
+        - Credit Card Dues: {data.get('cc_dues')}
 
         Insurance:
-        - Health: {data['health_insurance']}
-        - Term: {data['term_insurance']}
+        - Health: {data.get('health_insurance')}
+        - Term: {data.get('term_insurance')}
 
         Goals:
-        {data['goals']}
+        {data.get('goals')}
 
-        Give:
-        1. Spending mistakes
+        Give structured output:
+        1. Key spending mistakes
         2. Savings improvement plan
         3. Debt reduction strategy
         4. Investment plan (SIP, FD, stocks)
-        5. Retirement planning based on age
+        5. Retirement planning
         """
 
     # =========================
-    # LLM CALL
+    # LLM CALL (with safety)
     # =========================
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",   # stable model
+            contents=prompt
+        )
 
-    return response.text
+        return response.text if response.text else "No response generated."
+
+    except Exception as e:
+         
+        
+         return f"ERROR: {str(e)}"

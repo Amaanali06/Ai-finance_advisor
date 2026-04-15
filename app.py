@@ -1,27 +1,44 @@
 import streamlit as st
+import pandas as pd
 from analyzer import analyze_finances
 from llm_helper import get_financial_advice
+
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(page_title="AI Finance Advisor", layout="wide")
 
 st.title("💰 AI Finance Advisor")
 
 # =========================
-# USER INPUT
+# SESSION STATE (CHAT MEMORY)
 # =========================
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
+if "user_data" not in st.session_state:
+    st.session_state.user_data = None
+
+# =========================
+# USER INPUT (2 COLUMN UI)
+# =========================
 st.subheader("👤 User Profile")
 
-salary = st.number_input("Monthly Salary", min_value=0)
-age = st.number_input("Age", min_value=18, max_value=100)
-savings = st.number_input("Current Savings")
+col1, col2 = st.columns(2)
+
+with col1:
+    salary = st.number_input("💰 Monthly Salary", min_value=0)
+    age = st.number_input("🎂 Age", min_value=18, max_value=100)
+
+with col2:
+    savings = st.number_input("🏦 Current Savings")
 
 # =========================
-# DYNAMIC EXPENSES
+# EXPENSES
 # =========================
-
 st.subheader("💸 Expenses")
 
 expense_data = {}
-
 num_expenses = st.number_input("Number of expense categories", min_value=1, step=1)
 
 for i in range(int(num_expenses)):
@@ -37,19 +54,21 @@ for i in range(int(num_expenses)):
 # =========================
 # FINANCIAL DETAILS
 # =========================
-
 st.subheader("🏦 Financial Details")
 
-loans = st.number_input("Loan EMI (monthly)")
-cc_dues = st.number_input("Credit Card Dues")
+col3, col4 = st.columns(2)
 
-health_insurance = st.number_input("Health Insurance (yearly)")
-term_insurance = st.number_input("Term Insurance (yearly)")
+with col3:
+    loans = st.number_input("💳 Loan EMI (monthly)")
+    cc_dues = st.number_input("💳 Credit Card Dues")
+
+with col4:
+    health_insurance = st.number_input("🛡 Health Insurance (yearly)")
+    term_insurance = st.number_input("🛡 Term Insurance (yearly)")
 
 # =========================
 # GOALS
 # =========================
-
 st.subheader("🎯 Financial Goals")
 
 goal = st.text_area("Your goals (house, car, retirement, etc.)")
@@ -57,10 +76,8 @@ goal = st.text_area("Your goals (house, car, retirement, etc.)")
 # =========================
 # ANALYZE BUTTON
 # =========================
+if st.button("🚀 Analyze"):
 
-if st.button("Analyze"):
-
-    # Run rule engine
     result = analyze_finances(salary, expense_data)
 
     st.subheader("📊 Analysis")
@@ -68,9 +85,15 @@ if st.button("Analyze"):
     st.write(f"Savings: ₹{result['savings']}")
 
     for insight in result["insights"]:
-        st.write(insight)
+        st.write("👉", insight)
 
-    # Prepare data for AI
+    # 📊 Chart
+    if expense_data:
+        df = pd.DataFrame(list(expense_data.items()), columns=["Category", "Amount"])
+        st.subheader("📊 Expense Breakdown")
+        st.bar_chart(df.set_index("Category"))
+
+    # Prepare data
     data = {
         "salary": salary,
         "age": age,
@@ -83,35 +106,54 @@ if st.button("Analyze"):
         "goals": goal
     }
 
-    # Store in session (for chat use)
-    st.session_state["user_data"] = data
+    st.session_state.user_data = data
 
-    # Get AI advice
-    advice = get_financial_advice(data)
+    # AI Advice
+    with st.spinner("🤖 Generating financial advice..."):
+        advice = get_financial_advice(data)
 
     st.subheader("🤖 AI Advice")
     st.write(advice)
 
 # =========================
-# CHAT SECTION
+# CHAT SECTION (IMPROVED)
 # =========================
-
-st.subheader("💬 Ask Follow-up Questions")
+st.subheader("💬 Financial Chat Assistant")
 
 user_query = st.text_input("Ask anything about your finances")
 
-if user_query and "user_data" in st.session_state:
+if user_query and st.session_state.user_data:
+
+    st.session_state.chat_history.append({"role": "user", "content": user_query})
+
+    # Build conversation context
+    full_context = ""
+    for chat in st.session_state.chat_history:
+        full_context += f"{chat['role']}: {chat['content']}\n"
 
     chat_prompt = f"""
-    You are a financial advisor.
+    You are a smart financial advisor.
 
     User data:
-    {st.session_state['user_data']}
+    {st.session_state.user_data}
 
-    Answer this:
-    {user_query}
+    Conversation so far:
+    {full_context}
+
+    Rules:
+    - Do NOT repeat answers
+    - Be clear and practical
+    - Give personalized suggestions
     """
 
-    chat_response = get_financial_advice({"custom_prompt": chat_prompt})
+    with st.spinner("Thinking..."):
+        response = get_financial_advice({"custom_prompt": chat_prompt})
 
-    st.write("🤖", chat_response)
+    st.session_state.chat_history.append({"role": "assistant", "content": response})
+
+# =========================
+# DISPLAY CHAT (CHAT UI)
+# =========================
+for chat in st.session_state.chat_history:
+    with st.chat_message(chat["role"]):
+        st.write(chat["content"])
