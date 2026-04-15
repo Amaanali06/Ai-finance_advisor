@@ -63,7 +63,7 @@ def get_financial_advice(data):
     # =========================
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",   # stable model
+            model="gemini-1.5-flash",   # stable model
             contents=prompt
         )
 
